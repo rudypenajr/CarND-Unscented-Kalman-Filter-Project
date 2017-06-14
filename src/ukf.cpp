@@ -118,9 +118,9 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     time_us_ = meas_package.timestamp_;
     is_initialized_ = true;
 
-    cout << "Initialition Complete." << endl;
-    cout << "x_: " << "\n" << x_ << endl;
-    cout << "P_: " << "\n" << P_ << endl;
+    // cout << "Initialition Complete." << endl;
+    // cout << "x_: " << "\n" << x_ << endl;
+    // cout << "P_: " << "\n" << P_ << endl;
     return;
   }
 
@@ -133,9 +133,11 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   if(meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_ == true) {
     n_z_ = 3;
     UKF::UpdateRadar(meas_package);
+    cout << "Update Radar" << endl;
   } else if(meas_package.sensor_type_ == MeasurementPackage::LASER && use_laser_ == true) {
     n_z_ = 2;
     UKF::UpdateLidar(meas_package);
+    cout << "Update Lidar" << endl;
   }
 }
 
@@ -192,7 +194,7 @@ void UKF::GenerateSigmaPoints() {
     Xsig_aug_.col(i + 1 + n_aug_)  = x_aug - sqrt(lambda_ + n_aug_) * L.col(i);
   }
 
-  cout << "Xsig_aug_: " << Xsig_aug_ << endl;
+  // cout << "Xsig_aug_: " << Xsig_aug_ << endl;
 }
 
 void UKF::SigmaPointPrediction(double delta_t) {
@@ -261,6 +263,10 @@ void UKF::PredictMeanAndCovariance() {
   }
 }
 
+/**
+ * Updates the state and the state covariance matrix using a radar measurement.
+ * @param {MeasurementPackage} meas_package
+ */
 void UKF::UpdateRadar(MeasurementPackage meas_package) {
   /**
   TODO:
@@ -275,6 +281,14 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
         meas_package.raw_measurements_[1],
         meas_package.raw_measurements_[2];
 
+  UKF::PredictRadarMeasurement();
+  UKF::UpdateState(meas_package);
+
+  NIS_radar_ = (z_ - z_pred_).transpose() * S_.inverse() * (z_ - z_pred_);
+  cout << "NIS_radar_: " << NIS_radar_ << endl;
+}
+
+void UKF::PredictRadarMeasurement() {
   ///* Matrix for Sigma Points into Measurement Space
   Zsig_ = MatrixXd(n_z_, n_aug_sigma_);
 
@@ -327,9 +341,6 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
   // cout << "z_pred_: " << endl << z_pred_ << endl;
   // cout << "S_: " << endl << S_ << endl;
-
-  NIS_radar_ = (z_ - z_pred_).transpose() * S_.inverse() * (z_ - z_pred_);
-  cout << "NIS_radar_: " << NIS_radar_ << endl;
 }
 
 /**
@@ -350,6 +361,14 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   z_ << meas_package.raw_measurements_[0],
         meas_package.raw_measurements_[1];
 
+  UKF::PredictLidarMeasurement();
+  UKF::UpdateState(meas_package);
+
+  NIS_lidar_ = (z_ - z_pred_).transpose() * S_.inverse() * (z_ - z_pred_);
+  cout << "NIS_lidar_: " << NIS_lidar_ << endl;
+}
+
+void UKF::PredictLidarMeasurement() {
   ///* Matrix for Sigma Points into Measurement Space
   Zsig_ = MatrixXd(n_z_, n_aug_sigma_);
 
@@ -393,12 +412,44 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   // cout << "z_pred_: " << endl << z_pred_ << endl;
   // cout << "S_: " << endl << S_ << endl;
-
-  NIS_lidar_ = (z_ - z_pred_).transpose() * S_.inverse() * (z_ - z_pred_);
-  cout << "NIS_lidar_: " << NIS_lidar_ << endl;
 }
 
-/**
- * Updates the state and the state covariance matrix using a radar measurement.
- * @param {MeasurementPackage} meas_package
- */
+
+void UKF::UpdateState(MeasurementPackage meas_package) {
+  // Matrix for Cross Correlation
+  MatrixXd Tc = MatrixXd(n_x_, n_z_);
+  Tc.fill(0.0);
+
+  for (int i=0; i< n_aug_sigma_; i++) {
+    // residual
+    VectorXd z_diff = Zsig_.col(i) - z_pred_;
+    // state difference
+    VectorXd x_diff = Xsig_pred_.col(i) - x_;
+
+    if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
+      // angle normalization: z_diff & x_diff
+      while (z_diff(1) > M_PI) z_diff(1) -= 2. * M_PI;
+      while (z_diff(1) <-M_PI) z_diff(1) += 2. * M_PI;
+
+      while (x_diff(3) > M_PI) x_diff(3) -= 2. * M_PI;
+      while (x_diff(3) <-M_PI) x_diff(3) += 2. * M_PI;
+    }
+
+    Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
+  }
+
+  // Kalman Gain: K
+  MatrixXd K = Tc * S_.inverse();
+
+  // residual, again
+  VectorXd z_diff = z_ - z_pred_;
+
+  // angle normalization: z_diff
+  if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
+    while (z_diff(1) > M_PI) z_diff(1) -= 2. * M_PI;
+    while (z_diff(1) <-M_PI) z_diff(1) += 2. * M_PI;
+  }
+
+  x_ = x_ + K * z_diff;
+  P_ = P_ - K * S_ * K.transpose();
+}
