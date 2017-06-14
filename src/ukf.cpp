@@ -44,13 +44,6 @@ UKF::UKF() {
   // Radar measurement noise standard deviation radius change in m/s
   std_radrd_ = 0.3; // Taken fm Assignment
 
-  /**
-  TODO:
-
-  Complete the initialization. See ukf.h for other member properties.
-
-  Hint: one or more values initialized above might be wildly off...
-  */
   // State Dimension
   n_x_ = 5;
 
@@ -272,14 +265,6 @@ void UKF::PredictMeanAndCovariance() {
  * @param {MeasurementPackage} meas_package
  */
 void UKF::UpdateRadar(MeasurementPackage meas_package) {
-  /**
-  TODO:
-
-  Complete this function! Use radar data to update the belief about the object's
-  position. Modify the state vector, x_, and covariance, P_.
-
-  You'll also need to calculate the radar NIS.
-  */
   z_ = VectorXd(n_z_); // z_pred in assignment
   z_ << meas_package.raw_measurements_[0],
         meas_package.raw_measurements_[1],
@@ -358,15 +343,6 @@ void UKF::PredictRadarMeasurement() {
  * @param {MeasurementPackage} meas_package
  */
 void UKF::UpdateLidar(MeasurementPackage meas_package) {
-  /**
-  TODO:
-
-  Complete this function! Use lidar data to update the belief about the object's
-  position. Modify the state vector, x_, and covariance, P_.
-
-  You'll also need to calculate the lidar NIS.
-  */
-
   z_ = VectorXd(n_z_); // z_pred in assignment
   z_ << meas_package.raw_measurements_[0],
         meas_package.raw_measurements_[1];
