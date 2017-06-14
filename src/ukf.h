@@ -120,7 +120,7 @@ public:
    */
   void Prediction(double delta_t);
   void GenerateSigmaPoints();
-  // void SigmaPointPrediction();
+  void SigmaPointPrediction(double delta_t);
   // void PredictMeanAndCovariance();
 
   /**

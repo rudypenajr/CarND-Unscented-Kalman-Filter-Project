@@ -120,8 +120,8 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     is_initialized_ = true;
 
     cout << "Initialition Complete." << endl;
-    cout << "x_: " << x_ << endl;
-    cout << "P_: " << P_ << endl;
+    cout << "x_: " << "\n" << x_ << endl;
+    cout << "P_: " << "\n" << P_ << endl;
     return;
   }
 
@@ -147,13 +147,16 @@ void UKF::Prediction(double delta_t) {
 
   /**
     Prediction:
-      1. Generate Sigma points
-      2. Predict Sigma points
+      1. Generate Sigma Points
+      2. Predict Sigma Points
       3. Predict Mean and covariance
   */
 
   //* 1. Generate Sigma points
   UKF::GenerateSigmaPoints();
+
+  //* 2. Predict Sigma Points
+  UKF::SigmaPointPrediction(delta_t);
 }
 
 void UKF::GenerateSigmaPoints() {
@@ -187,6 +190,49 @@ void UKF::GenerateSigmaPoints() {
   }
 
   cout << "Xsig_aug_: " << Xsig_aug_ << endl;
+}
+
+void UKF::SigmaPointPrediction(double delta_t) {
+   for (int i = 0; i < n_aug_sigma_; i++) {
+     double p_x, p_y, v, yaw, yawd, nu_a, nu_yawdd;
+
+      p_x = Xsig_aug_(0, i);
+      p_y = Xsig_aug_(1, i);
+      v = Xsig_aug_(2, i);
+      yaw = Xsig_aug_(3, i);
+      yawd = Xsig_aug_(4, i);
+      nu_a = Xsig_aug_(5, i);
+      nu_yawdd = Xsig_aug_(6, i);
+
+    double px_p, py_p; // predicted state values
+
+    if (fabs(yawd) > 0.001) {
+      px_p = p_x + v/yawd * ( sin(yaw + yawd*delta_t) - sin(yaw) );
+      py_p = p_y + v/yawd * ( cos(yaw) - cos(yaw + yawd*delta_t) );
+    } else {
+      px_p = p_x + v*delta_t*cos(yaw);
+      py_p = p_y + v*delta_t*sin(yaw);
+    }
+
+    double v_p = v;
+    double yaw_p = yaw + yawd*delta_t;
+    double yawd_p = yawd;
+
+    //add noise
+    px_p = px_p + 0.5*nu_a*delta_t*delta_t * cos(yaw);
+    py_p = py_p + 0.5*nu_a*delta_t*delta_t * sin(yaw);
+    v_p = v_p + nu_a*delta_t;
+
+    yaw_p = yaw_p + 0.5*nu_yawdd*delta_t*delta_t;
+    yawd_p = yawd_p + nu_yawdd*delta_t;
+
+    //write predicted sigma point into right column
+    Xsig_pred_(0,i) = px_p;
+    Xsig_pred_(1,i) = py_p;
+    Xsig_pred_(2,i) = v_p;
+    Xsig_pred_(3,i) = yaw_p;
+    Xsig_pred_(4,i) = yawd_p;
+  }
 }
 
 /**
