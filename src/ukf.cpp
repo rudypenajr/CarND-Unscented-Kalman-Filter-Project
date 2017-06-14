@@ -97,6 +97,39 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   Complete this function! Make sure you switch between lidar and radar
   measurements.
   */
+  if (!is_initialized_) {
+    P_ << 1, 0, 0, 0, 0,
+          0, 1, 0, 0, 0,
+          0, 0, 1, 0, 0,
+          0, 0, 0, 1, 0,
+          0, 0, 0, 0, 1;
+
+    if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
+      double rho = meas_package.raw_measurements_[0];
+      double phi = meas_package.raw_measurements_[1];
+      double px = rho * cos(phi);
+      double py = rho * sin(phi);
+      x_ << px, py, 0, 0, 0;
+    } else if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
+      double px = meas_package.raw_measurements_[0];
+      double py = meas_package.raw_measurements_[1];
+      x_ << px, py, 0, 0, 0;
+    }
+
+    time_us_ = meas_package.timestamp_;
+    is_initialized_ = true;
+
+    cout << "Initialition Complete." << endl;
+    cout << "x_: " << x_ << endl;
+    cout << "P_: " << P_ << endl;
+    return;
+  }
+
+  double delta_t = (meas_package.timestamp_ - time_us_) / 1000000.0;
+  time_us_ = meas_package.timestamp_;
+  cout << "time_us_: " << time_us_ << endl;
+
+  UKF::Prediction(delta_t);
 }
 
 /**
@@ -111,6 +144,49 @@ void UKF::Prediction(double delta_t) {
   Complete this function! Estimate the object's location. Modify the state
   vector, x_. Predict sigma points, the state, and the state covariance matrix.
   */
+
+  /**
+    Prediction:
+      1. Generate Sigma points
+      2. Predict Sigma points
+      3. Predict Mean and covariance
+  */
+
+  //* 1. Generate Sigma points
+  UKF::GenerateSigmaPoints();
+}
+
+void UKF::GenerateSigmaPoints() {
+  // Create Augmented Mean Vector
+  VectorXd x_aug = VectorXd(7);
+
+  // Create Augmented State Covariance
+  MatrixXd P_aug = MatrixXd(7, 7);
+
+  // Xsig_aug is already delcared: Xsig_aug_
+
+  // Create Augmented Mean State
+  x_aug.head(5) = x_;
+  x_aug(5) = 0;
+  x_aug(6) = 0;
+
+  // Create Augmented Covariance Matrix
+  P_aug.fill(0.0);
+  P_aug.topLeftCorner(5, 5) = P_;
+  P_aug(5, 5) = std_a_*std_a_;
+  P_aug(6, 6) = std_yawdd_*std_yawdd_;
+
+  // Create square root matrix
+  MatrixXd L = P_aug.llt().matrixL();
+
+  // Create Augmented Sigma Points
+  Xsig_aug_.col(0) = x_aug;
+  for (int i = 0; i < n_aug_sigma_; i++) {
+    Xsig_aug_.col(i + 1)           = x_aug + sqrt(lambda_ + n_aug_) * L.col(i);
+    Xsig_aug_.col(i + 1 + n_aug_)  = x_aug - sqrt(lambda_ + n_aug_) * L.col(i);
+  }
+
+  cout << "Xsig_aug_: " << Xsig_aug_ << endl;
 }
 
 /**
