@@ -133,8 +133,9 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   if(meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_ == true) {
     n_z_ = 3;
     UKF::UpdateRadar(meas_package);
-  } else {
-    cout << "Omitting Laser Measurement for time being." << endl;
+  } else if(meas_package.sensor_type_ == MeasurementPackage::LASER && use_laser_ == true) {
+    n_z_ = 2;
+    UKF::UpdateLidar(meas_package);
   }
 }
 
@@ -163,10 +164,10 @@ void UKF::Prediction(double delta_t) {
 
 void UKF::GenerateSigmaPoints() {
   // Create Augmented Mean Vector
-  VectorXd x_aug = VectorXd(7);
+  VectorXd x_aug = VectorXd(n_aug_);
 
   // Create Augmented State Covariance
-  MatrixXd P_aug = MatrixXd(7, 7);
+  MatrixXd P_aug = MatrixXd(n_aug_, n_aug_);
 
   // Xsig_aug is already delcared: Xsig_aug_
 
@@ -177,16 +178,16 @@ void UKF::GenerateSigmaPoints() {
 
   // Create Augmented Covariance Matrix
   P_aug.fill(0.0);
-  P_aug.topLeftCorner(5, 5) = P_;
-  P_aug(5, 5) = std_a_*std_a_;
-  P_aug(6, 6) = std_yawdd_*std_yawdd_;
+  P_aug.topLeftCorner(n_x_, n_x_) = P_;
+  P_aug(n_aug_-2, n_aug_-2) = std_a_ * std_a_;
+  P_aug(n_aug_-1, n_aug_-1) = std_yawdd_ * std_yawdd_;
 
   // Create square root matrix
   MatrixXd L = P_aug.llt().matrixL();
 
   // Create Augmented Sigma Points
   Xsig_aug_.col(0) = x_aug;
-  for (int i = 0; i < n_aug_sigma_; i++) {
+  for (int i = 0; i < n_aug_; i++) {
     Xsig_aug_.col(i + 1)           = x_aug + sqrt(lambda_ + n_aug_) * L.col(i);
     Xsig_aug_.col(i + 1 + n_aug_)  = x_aug - sqrt(lambda_ + n_aug_) * L.col(i);
   }
@@ -324,12 +325,11 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
   S_ = S_ + R;
 
-  cout << "z_pred_: " << endl << z_pred_ << endl;
-  cout << "S_: " << endl << S_ << endl;
+  // cout << "z_pred_: " << endl << z_pred_ << endl;
+  // cout << "S_: " << endl << S_ << endl;
 
   NIS_radar_ = (z_ - z_pred_).transpose() * S_.inverse() * (z_ - z_pred_);
-
-  cout << "NIS_radar_: " << endl << NIS_radar_ << endl;
+  cout << "NIS_radar_: " << NIS_radar_ << endl;
 }
 
 /**
@@ -345,6 +345,57 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   You'll also need to calculate the lidar NIS.
   */
+
+  z_ = VectorXd(n_z_); // z_pred in assignment
+  z_ << meas_package.raw_measurements_[0],
+        meas_package.raw_measurements_[1];
+
+  ///* Matrix for Sigma Points into Measurement Space
+  Zsig_ = MatrixXd(n_z_, n_aug_sigma_);
+
+  // Transform sigma points into measurement space
+  for (int i = 0; i < n_aug_sigma_; i++) {
+    double p_x, p_y, v, yaw;
+
+     p_x = Xsig_pred_(0, i);
+     p_y = Xsig_pred_(1, i);
+
+    //  Measurement Model
+    Zsig_(0, i) = p_x;
+    Zsig_(1, i) = p_y;
+  }
+
+  // Predicted Measurement Mean: z_pred
+  z_pred_ = VectorXd(n_z_);
+  for (int i = 0; i < n_aug_sigma_; i++) {
+    z_pred_ = z_pred_ + weights_(i) * Zsig_.col(i);
+  }
+
+  // Predicted Measurement Covariance
+  S_ = MatrixXd(n_z_, n_z_);
+  S_.fill(0.0);
+  for (int i = 0; i < n_aug_sigma_; i++) {
+    // residual
+    VectorXd z_diff = Zsig_.col(i) - z_pred_;
+
+    //angle normalization
+    while (z_diff(1)> M_PI) z_diff(1) -= 2. * M_PI;
+    while (z_diff(1)<-M_PI) z_diff(1) += 2. * M_PI;
+
+    S_ = S_ + weights_(i) * z_diff * z_diff.transpose();
+  }
+
+  MatrixXd R = MatrixXd(n_z_, n_z_);
+  R <<  std_laspx_*std_laspx_, 0,
+        0, std_laspy_*std_laspy_;
+
+  S_ = S_ + R;
+
+  // cout << "z_pred_: " << endl << z_pred_ << endl;
+  // cout << "S_: " << endl << S_ << endl;
+
+  NIS_lidar_ = (z_ - z_pred_).transpose() * S_.inverse() * (z_ - z_pred_);
+  cout << "NIS_lidar_: " << NIS_lidar_ << endl;
 }
 
 /**
