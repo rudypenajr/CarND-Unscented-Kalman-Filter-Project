@@ -67,6 +67,35 @@ public:
   ///* Sigma point spreading parameter
   double lambda_;
 
+  //
+  ///* Added by Rudy
+  //
+  ///* augmented sigma points matrix
+  MatrixXd Xsig_aug_;
+
+  ///* Number of sigma points (2 * n_aug_ + 1)
+  int n_aug_sigma_;
+
+  ///* Measurement dimensions assigned by radar/lidar
+  int n_z_;
+
+  ///* Matrix for Sigma POints into Measurement Space
+  MatrixXd Zsig_;
+
+  ///* Radar/Lidear Measurement Vector (Predict Radar Measurement Step)
+  VectorXd z_;
+
+  ///* Measurement Prediction (Predict Radar Measurement Step)
+  VectorXd z_pred_;
+
+  ///* Measurement Covariance (Predict Radar Measurement Step)
+  MatrixXd S_;
+
+  ///* Current NIS for radar
+  double NIS_radar_;
+
+  ///* Current NIS for lidar
+  double NIS_lider_;
 
   /**
    * Constructor

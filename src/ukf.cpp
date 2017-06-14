@@ -51,6 +51,37 @@ UKF::UKF() {
 
   Hint: one or more values initialized above might be wildly off...
   */
+  // State Dimension
+  n_x_ = 5;
+
+  // Augmented State Dimension
+  n_aug_ = 7;
+
+  // # of Sigma Points
+  n_aug_sigma_ = 2 * n_aug_ + 1;
+
+  // Sigma Point Spreading Parameter
+  lambda_ = 3 - n_aug_;
+
+  // Predicted Sigma Points Matrix
+  Xsig_pred_ = MatrixXd(n_x_, n_aug_sigma_);
+
+  // Augmented Sigma Points Matrix
+  Xsig_aug_ = MatrixXd(n_aug_, n_aug_sigma_);
+
+  // Sigma Point Weights
+  weights_ = VectorXd(2 * n_aug_ + 1);
+
+  // Set Sigma Point Weights
+  double weight_0 = lambda_ / (lambda_ + n_aug_);
+  weights_(0) = weight_0;
+
+  for (int i = 1; i < n_aug_sigma_; i++)
+  {
+    double weight = 0.5 /(n_aug_ + lambda_);
+    weights_(i) = weight;
+  }
+
 }
 
 UKF::~UKF() {}
