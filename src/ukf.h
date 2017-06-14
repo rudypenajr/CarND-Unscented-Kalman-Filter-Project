@@ -79,16 +79,16 @@ public:
   ///* Measurement dimensions assigned by radar/lidar
   int n_z_;
 
-  ///* Matrix for Sigma POints into Measurement Space
+  ///* Matrix for Sigma Points into Measurement Space
   MatrixXd Zsig_;
 
   ///* Radar/Lidear Measurement Vector (Predict Radar Measurement Step)
   VectorXd z_;
 
-  ///* Measurement Prediction (Predict Radar Measurement Step)
+  ///* Measurement Prediction Mean (Predict Radar Measurement Step)
   VectorXd z_pred_;
 
-  ///* Measurement Covariance (Predict Radar Measurement Step)
+  ///* Measurement Prediction Covariance (Predict Radar Measurement Step)
   MatrixXd S_;
 
   ///* Current NIS for radar

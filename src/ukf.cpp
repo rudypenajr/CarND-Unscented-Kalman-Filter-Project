@@ -36,13 +36,13 @@ UKF::UKF() {
   std_laspy_ = 0.15;
 
   // Radar measurement noise standard deviation radius in m
-  std_radr_ = 0.3;
+  std_radr_ = 0.3; // Taken fm Assignment
 
   // Radar measurement noise standard deviation angle in rad
-  std_radphi_ = 0.03;
+  std_radphi_ = 0.0175; // Taken fm Assignment
 
   // Radar measurement noise standard deviation radius change in m/s
-  std_radrd_ = 0.3;
+  std_radrd_ = 0.1; // Taken fm Assignment
 
   /**
   TODO:
@@ -81,7 +81,6 @@ UKF::UKF() {
     double weight = 0.5 /(n_aug_ + lambda_);
     weights_(i) = weight;
   }
-
 }
 
 UKF::~UKF() {}
@@ -130,6 +129,13 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   cout << "time_us_: " << time_us_ << endl;
 
   UKF::Prediction(delta_t);
+
+  if(meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_ == true) {
+    n_z_ = 3;
+    UKF::UpdateRadar(meas_package);
+  } else {
+    cout << "Omitting Laser Measurement for time being." << endl;
+  }
 }
 
 /**
@@ -138,13 +144,6 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
  * measurement and this one.
  */
 void UKF::Prediction(double delta_t) {
-  /**
-  TODO:
-
-  Complete this function! Estimate the object's location. Modify the state
-  vector, x_. Predict sigma points, the state, and the state covariance matrix.
-  */
-
   /**
     Prediction:
       1. Generate Sigma Points
@@ -261,6 +260,78 @@ void UKF::PredictMeanAndCovariance() {
   }
 }
 
+void UKF::UpdateRadar(MeasurementPackage meas_package) {
+  /**
+  TODO:
+
+  Complete this function! Use radar data to update the belief about the object's
+  position. Modify the state vector, x_, and covariance, P_.
+
+  You'll also need to calculate the radar NIS.
+  */
+  z_ = VectorXd(n_z_); // z_pred in assignment
+  z_ << meas_package.raw_measurements_[0],
+        meas_package.raw_measurements_[1],
+        meas_package.raw_measurements_[2];
+
+  ///* Matrix for Sigma Points into Measurement Space
+  Zsig_ = MatrixXd(n_z_, n_aug_sigma_);
+
+  // Transform sigma points into measurement space
+  for (int i = 0; i < n_aug_sigma_; i++) {
+    double p_x, p_y, v, yaw;
+
+     p_x = Xsig_pred_(0, i);
+     p_y = Xsig_pred_(1, i);
+     v = Xsig_pred_(2, i);
+     yaw = Xsig_pred_(3, i);
+
+     double v1, v2;
+     v1 = cos(yaw) * v;
+     v2 = sin(yaw) * v;
+
+    //  Measurement Model
+    Zsig_(0, i) = sqrt(p_x*p_x + p_y*p_y);
+    Zsig_(1, i) = atan2(p_y, p_x);
+    Zsig_(2, i) = (p_x * v1 + p_y * v2)/ sqrt(p_x*p_x + p_y*p_y);
+  }
+
+  // Predicted Measurement Mean: z_pred
+  z_pred_ = VectorXd(n_z_);
+  for (int i = 0; i < n_aug_sigma_; i++) {
+    z_pred_ = z_pred_ + weights_(i) * Zsig_.col(i);
+  }
+
+  // Predicted Measurement Covariance
+  S_ = MatrixXd(n_z_, n_z_);
+  S_.fill(0.0);
+  for (int i = 0; i < n_aug_sigma_; i++) {
+    // residual
+    VectorXd z_diff = Zsig_.col(i) - z_pred_;
+
+    //angle normalization
+    while (z_diff(1)> M_PI) z_diff(1) -= 2. * M_PI;
+    while (z_diff(1)<-M_PI) z_diff(1) += 2. * M_PI;
+
+    S_ = S_ + weights_(i) * z_diff * z_diff.transpose();
+  }
+
+  // Add Measurement Noise Covariance Matrix
+  MatrixXd R = MatrixXd(n_z_, n_z_);
+  R <<  std_radr_*std_radr_, 0, 0,
+        0, std_radphi_*std_radphi_, 0,
+        0, 0, std_radrd_*std_radrd_;
+
+  S_ = S_ + R;
+
+  cout << "z_pred_: " << endl << z_pred_ << endl;
+  cout << "S_: " << endl << S_ << endl;
+
+  NIS_radar_ = (z_ - z_pred_).transpose() * S_.inverse() * (z_ - z_pred_);
+
+  cout << "NIS_radar_: " << endl << NIS_radar_ << endl;
+}
+
 /**
  * Updates the state and the state covariance matrix using a laser measurement.
  * @param {MeasurementPackage} meas_package
@@ -280,13 +351,3 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
  * Updates the state and the state covariance matrix using a radar measurement.
  * @param {MeasurementPackage} meas_package
  */
-void UKF::UpdateRadar(MeasurementPackage meas_package) {
-  /**
-  TODO:
-
-  Complete this function! Use radar data to update the belief about the object's
-  position. Modify the state vector, x_, and covariance, P_.
-
-  You'll also need to calculate the radar NIS.
-  */
-}
