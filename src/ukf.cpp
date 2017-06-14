@@ -15,7 +15,7 @@ UKF::UKF() {
   use_laser_ = true;
 
   // if this is false, radar measurements will be ignored (except during init)
-  use_radar_ = true;
+  use_radar_ = false;
 
   // initial state vector
   x_ = VectorXd(5);
@@ -24,10 +24,10 @@ UKF::UKF() {
   P_ = MatrixXd(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 30;
+  std_a_ = 0.5; // 5 - 2
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 30;
+  std_yawdd_ = 0.35; // 0.5 - 0.2
 
   // Laser measurement noise standard deviation position1 in m
   std_laspx_ = 0.15;
@@ -39,10 +39,10 @@ UKF::UKF() {
   std_radr_ = 0.3; // Taken fm Assignment
 
   // Radar measurement noise standard deviation angle in rad
-  std_radphi_ = 0.0175; // Taken fm Assignment
+  std_radphi_ = 0.3; // Taken fm Assignment
 
   // Radar measurement noise standard deviation radius change in m/s
-  std_radrd_ = 0.1; // Taken fm Assignment
+  std_radrd_ = 0.3; // Taken fm Assignment
 
   /**
   TODO:
@@ -90,12 +90,6 @@ UKF::~UKF() {}
  * either radar or laser.
  */
 void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
-  /**
-  TODO:
-
-  Complete this function! Make sure you switch between lidar and radar
-  measurements.
-  */
   if (!is_initialized_) {
     P_ << 1, 0, 0, 0, 0,
           0, 1, 0, 0, 0,
@@ -106,13 +100,23 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
       double rho = meas_package.raw_measurements_[0];
       double phi = meas_package.raw_measurements_[1];
+      double rho_dot = meas_package.raw_measurements_[2];
       double px = rho * cos(phi);
       double py = rho * sin(phi);
-      x_ << px, py, 0, 0, 0;
+      // x_ << px, py, 0, 0, 0;
+
+      x_[0] = px;
+      x_[1] = py;
+      x_[2] = rho_dot * py;
+      x_[3] = rho_dot * px;
+
     } else if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
       double px = meas_package.raw_measurements_[0];
       double py = meas_package.raw_measurements_[1];
-      x_ << px, py, 0, 0, 0;
+      // x_ << px, py, 0, 0, 0;
+
+      x_[0] = px;
+      x_[1] = py;
     }
 
     time_us_ = meas_package.timestamp_;
@@ -306,9 +310,15 @@ void UKF::PredictRadarMeasurement() {
      v2 = sin(yaw) * v;
 
     //  Measurement Model
-    Zsig_(0, i) = sqrt(p_x*p_x + p_y*p_y);
-    Zsig_(1, i) = atan2(p_y, p_x);
-    Zsig_(2, i) = (p_x * v1 + p_y * v2)/ sqrt(p_x*p_x + p_y*p_y);
+    if (p_x == 0 && p_y == 0) {
+      Zsig_(0, i) = 0;
+      Zsig_(1, i) = 0;
+      Zsig_(2, i) = 0;
+    } else {
+      Zsig_(0, i) = sqrt(p_x*p_x + p_y*p_y);
+      Zsig_(1, i) = atan2(p_y, p_x);
+      Zsig_(2, i) = (p_x * v1 + p_y * v2)/ sqrt(p_x*p_x + p_y*p_y);
+    }
   }
 
   // Predicted Measurement Mean: z_pred
