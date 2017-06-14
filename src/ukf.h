@@ -121,7 +121,7 @@ public:
   void Prediction(double delta_t);
   void GenerateSigmaPoints();
   void SigmaPointPrediction(double delta_t);
-  // void PredictMeanAndCovariance();
+  void PredictMeanAndCovariance();
 
   /**
    * Updates the state and the state covariance matrix using a laser measurement

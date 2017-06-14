@@ -149,7 +149,7 @@ void UKF::Prediction(double delta_t) {
     Prediction:
       1. Generate Sigma Points
       2. Predict Sigma Points
-      3. Predict Mean and covariance
+      3. Predict Mean and Covariance
   */
 
   //* 1. Generate Sigma points
@@ -157,6 +157,9 @@ void UKF::Prediction(double delta_t) {
 
   //* 2. Predict Sigma Points
   UKF::SigmaPointPrediction(delta_t);
+
+  //* 3. Predict Mean and Covariance
+  UKF::PredictMeanAndCovariance();
 }
 
 void UKF::GenerateSigmaPoints() {
@@ -232,6 +235,29 @@ void UKF::SigmaPointPrediction(double delta_t) {
     Xsig_pred_(2,i) = v_p;
     Xsig_pred_(3,i) = yaw_p;
     Xsig_pred_(4,i) = yawd_p;
+  }
+}
+
+void UKF::PredictMeanAndCovariance() {
+  // !weights set in initialization: weights_
+
+  // Predicted State Mean
+  x_.fill(0.0);
+  for (int i =0; i < n_aug_sigma_; i++) {
+    x_ = x_ + weights_(i) * Xsig_pred_.col(i);
+  }
+
+  // Predicted State Covariance
+  P_.fill(0.0);
+  for (int i =0; i < n_aug_sigma_; i++) {
+    // state difference
+    VectorXd x_diff = Xsig_pred_.col(i) - x_;
+
+    // angle normalization
+    while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
+    while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
+
+    P_ = P_ * weights_(i) * x_diff * x_diff.transpose();
   }
 }
 
