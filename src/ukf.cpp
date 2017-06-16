@@ -134,6 +134,13 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   time_us_ = meas_package.timestamp_;
   cout << "time_us_: " << time_us_ << endl;
 
+  while (delta_t > 0.2) {
+    cout << "delta_t is greater than 0.2." << endl;
+    double step = 0.1;
+    UKF::Prediction(step);
+    delta_t -= step;
+  }
+
   UKF::Prediction(delta_t);
 
   if(meas_package.sensor_type_ == MeasurementPackage::RADAR && use_radar_ == true) {
