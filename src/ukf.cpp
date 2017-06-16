@@ -9,8 +9,26 @@ using std::vector;
 
 /**
  * Initializes Unscented Kalman filter
+ * Goal   => 0.0900, 0.1000, 0.4000, 0.3000
+ * 5, 0.5 => 8.6619, 1.0611, 4.9832, 1.2397
+ * 4, 0.5 => 7.8263, 0.7775, 5.0450, 1.0171
+ * 2, 0.5 => 15.6479, 10.4775, 3.7272, 3.3329
+ * 1, 0.5 => 12.0846, 12.6983, 3.6933, 3.3836
+ * 6, 0.5 => 0.0595, 0.0928, 0.6892, 0.3822
+ * 7, 0.5 => 0.0551, 0.0959, 0.7503, 0.3924
+ *
+ * 6, 0.25 => 0.0646, 0.1036, 0.8659, 0.4567
+ * 6, 0.75 => 0.0592, 0.0947, 0.9666, 0.4682
+ *
+ * 6, 1 => 0.0779, 0.0890, 0.3970, 0.2903 ***
+ * 6, 0.5 => 0.0778, 0.0879, 0.3930, 0.2868 ***
+ * 5, 0.5 => 0.0770, 0.0870, 0.3813, 0.2721 ***
  */
 UKF::UKF() {
+  is_initialized_ = false;
+
+  time_us_ = 0.0;
+
   // if this is false, laser measurements will be ignored (except during init)
   use_laser_ = true;
 
@@ -22,13 +40,13 @@ UKF::UKF() {
   x_.fill(0.0);
 
   // initial covariance matrix
-  P_ = MatrixXd::Identity(5, 5);
+  P_ = MatrixXd(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 0.5; // 5 - 2
+  std_a_ = 5; // 5 - 2
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 0.35; // 0.5 - 0.2
+  std_yawdd_ = 0.5; // 0.5 - 0.2
 
   // Laser measurement noise standard deviation position1 in m
   std_laspx_ = 0.15;
@@ -44,9 +62,6 @@ UKF::UKF() {
 
   // Radar measurement noise standard deviation radius change in m/s
   std_radrd_ = 0.3;
-
-  is_initialized_ = false;
-  time_us_ = 0.0;
 
   // State Dimension
   n_x_ = 5;
@@ -94,6 +109,12 @@ UKF::~UKF() {}
  */
 void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
   if (!is_initialized_) {
+    P_ << 1, 0, 0, 0, 0,
+          0, 1, 0, 0, 0,
+          0, 0, 1, 0, 0,
+          0, 0, 0, 1, 0,
+          0, 0, 0, 0, 1;
+
     if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
       double rho = meas_package.raw_measurements_[0];
       double phi = meas_package.raw_measurements_[1];
@@ -200,7 +221,7 @@ void UKF::GenerateSigmaPoints() {
 
   // Create square root matrix
   MatrixXd L = P_aug.llt().matrixL();
-  L.fill(0.0);
+  // L.fill(0.0);
 
   // Create Augmented Sigma Points
   Xsig_aug_.col(0) = x_aug;
@@ -274,7 +295,7 @@ void UKF::PredictMeanAndCovariance() {
     while (x_diff(3)> M_PI) x_diff(3)-=2.*M_PI;
     while (x_diff(3)<-M_PI) x_diff(3)+=2.*M_PI;
 
-    P_ = P_ * weights_(i) * x_diff * x_diff.transpose();
+    P_ = P_ + weights_(i) * x_diff * x_diff.transpose();
   }
 }
 
@@ -315,15 +336,14 @@ void UKF::PredictRadarMeasurement() {
      v2 = sin(yaw) * v;
 
     //  Measurement Model
-    if (p_x == 0 && p_y == 0) {
-      Zsig_(0, i) = 0;
-      Zsig_(1, i) = 0;
-      Zsig_(2, i) = 0;
-    } else {
-      Zsig_(0, i) = sqrt(p_x*p_x + p_y*p_y);
-      Zsig_(1, i) = atan2(p_y, p_x);
-      Zsig_(2, i) = (p_x * v1 + p_y * v2)/ sqrt(p_x*p_x + p_y*p_y);
+    if (fabs(p_x) < 0.001 && fabs(p_y) < 0.001) {
+      p_x = 0.001;
+      p_y = 0.001;
     }
+
+    Zsig_(0, i) = sqrt(p_x*p_x + p_y*p_y);
+    Zsig_(1, i) = atan2(p_y, p_x);
+    Zsig_(2, i) = (p_x * v1 + p_y * v2)/ sqrt(p_x*p_x + p_y*p_y);
   }
 
   // Predicted Measurement Mean: z_pred
