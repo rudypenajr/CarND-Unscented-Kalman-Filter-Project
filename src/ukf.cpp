@@ -15,7 +15,7 @@ UKF::UKF() {
   use_laser_ = true;
 
   // if this is false, radar measurements will be ignored (except during init)
-  use_radar_ = false;
+  use_radar_ = true;
 
   // initial state vector
   x_ = VectorXd(5);
@@ -114,6 +114,11 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
 
       x_[0] = px;
       x_[1] = py;
+    }
+
+    if (fabs(x_[0]) < 0.001 && fabs(x_[1]) < 0.001 ) {
+      x_[0] = 0.001;
+      x_[1] = 0.001;
     }
 
     time_us_ = meas_package.timestamp_;
